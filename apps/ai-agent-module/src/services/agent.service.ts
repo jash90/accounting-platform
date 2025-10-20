@@ -13,7 +13,7 @@ import { UpdateAgentDto } from '../dto/update-agent.dto';
 import { AgentInputDto } from '../dto/agent-input.dto';
 import { AgentResponseDto } from '../dto/agent-response.dto';
 import { KnowledgeBase } from '../models/knowledge-base.model';
-import * as pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 
 @Injectable()
 export class AgentService {
