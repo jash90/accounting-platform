@@ -5,11 +5,18 @@ import {
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/auth';
+import { AppLayout } from '../components/layout/AppLayout';
 import { Login } from '../pages/Login';
 import { Signup } from '../pages/Signup';
 import { ForgotPassword } from '../pages/ForgotPassword';
 import { ResetPassword } from '../pages/ResetPassword';
 import { Dashboard } from '../pages/Dashboard';
+import { AuthCallback } from '../pages/AuthCallback';
+import { Invoices } from '../pages/Invoices';
+import { Expenses } from '../pages/Expenses';
+import { Clients } from '../pages/Clients';
+import { Reports } from '../pages/Reports';
+import { Settings } from '../pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,14 +73,21 @@ export function App() {
             </PublicRoute>
           }
         />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route
-          path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/invoices" element={<Invoices />} />
+          <Route path="/expenses" element={<Expenses />} />
+          <Route path="/clients" element={<Clients />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
     </QueryClientProvider>
