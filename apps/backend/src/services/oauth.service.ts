@@ -135,7 +135,7 @@ class OAuth2Service {
     });
   }
 
-  private async findOrCreateUser(
+  async findOrCreateUser(
     profile: OAuthProfile,
     accessToken: string,
     refreshToken?: string

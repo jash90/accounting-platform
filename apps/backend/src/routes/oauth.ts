@@ -2,25 +2,99 @@ import { Hono } from 'hono';
 import { passport, oauthService } from '../services/oauth.service';
 import { db, users } from '../db';
 import { eq } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
 
 const oauthRoutes = new Hono();
 
-// Helper to handle Passport authentication with Hono
-const passportAuthenticate = (strategy: string, options?: any) => {
-  return (c: any) => {
-    return new Promise((resolve, reject) => {
-      passport.authenticate(strategy, options, (err: any, user: any, info: any) => {
-        if (err) {
-          return reject(err);
-        }
-        if (!user) {
-          return c.json({ error: info?.message || 'Authentication failed' }, 401);
-        }
-        resolve(user);
-      })(c.req.raw, c.res);
-    });
+// Manual OAuth callback handler (bypasses Passport middleware for Hono compatibility)
+async function handleGoogleCallback(code: string) {
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/google/callback`,
+      grant_type: 'authorization_code',
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error('Failed to exchange code for tokens');
+  }
+
+  const tokens = await tokenResponse.json();
+
+  // Fetch user profile
+  const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  });
+
+  if (!profileResponse.ok) {
+    throw new Error('Failed to fetch user profile');
+  }
+
+  const profile = await profileResponse.json();
+
+  // Use oauthService to find or create user
+  const oauthProfile = {
+    id: profile.id,
+    email: profile.email,
+    firstName: profile.given_name || '',
+    lastName: profile.family_name || '',
+    profilePicture: profile.picture,
+    provider: 'google' as const,
   };
-};
+
+  return await oauthService.findOrCreateUser(oauthProfile, tokens.access_token, tokens.refresh_token);
+}
+
+// Manual GitHub callback handler
+async function handleGitHubCallback(code: string) {
+  const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+      code,
+      client_id: process.env.GITHUB_CLIENT_ID || '',
+      client_secret: process.env.GITHUB_CLIENT_SECRET || '',
+      redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/github/callback`,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error('Failed to exchange code for tokens');
+  }
+
+  const tokens = await tokenResponse.json();
+
+  // Fetch user profile
+  const profileResponse = await fetch('https://api.github.com/user', {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  });
+
+  if (!profileResponse.ok) {
+    throw new Error('Failed to fetch user profile');
+  }
+
+  const profile = await profileResponse.json();
+
+  const names = profile.name?.split(' ') || ['', ''];
+  const oauthProfile = {
+    id: profile.id.toString(),
+    email: profile.email || `${profile.login}@github.local`,
+    firstName: names[0] || profile.login || '',
+    lastName: names.slice(1).join(' ') || '',
+    profilePicture: profile.avatar_url,
+    provider: 'github' as const,
+  };
+
+  return await oauthService.findOrCreateUser(oauthProfile, tokens.access_token, tokens.refresh_token);
+}
 
 // Google OAuth routes
 oauthRoutes.get('/google', (c) => {
@@ -37,15 +111,21 @@ oauthRoutes.get('/google', (c) => {
 
 oauthRoutes.get('/google/callback', async (c) => {
   try {
-    const user: any = await passportAuthenticate('google')(c);
+    const code = c.req.query('code');
+
+    if (!code) {
+      throw new Error('No authorization code provided');
+    }
+
+    const user = await handleGoogleCallback(code);
     const token = oauthService.generateJWT(user);
 
     // Redirect to frontend with token
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
     return c.redirect(`${frontendUrl}/auth/callback?token=${token}&provider=google`);
   } catch (error) {
     console.error('Google OAuth error:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
     return c.redirect(`${frontendUrl}/auth/error?provider=google`);
   }
 });
@@ -62,15 +142,21 @@ oauthRoutes.get('/github', (c) => {
 
 oauthRoutes.get('/github/callback', async (c) => {
   try {
-    const user: any = await passportAuthenticate('github')(c);
+    const code = c.req.query('code');
+
+    if (!code) {
+      throw new Error('No authorization code provided');
+    }
+
+    const user = await handleGitHubCallback(code);
     const token = oauthService.generateJWT(user);
 
     // Redirect to frontend with token
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
     return c.redirect(`${frontendUrl}/auth/callback?token=${token}&provider=github`);
   } catch (error) {
     console.error('GitHub OAuth error:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
     return c.redirect(`${frontendUrl}/auth/error?provider=github`);
   }
 });
@@ -85,7 +171,6 @@ oauthRoutes.post('/logout', async (c) => {
     }
 
     // Decode token to get user ID
-    const jwt = await import('jsonwebtoken');
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
     // Revoke all OAuth sessions for this user
@@ -108,7 +193,6 @@ oauthRoutes.get('/me', async (c) => {
     }
 
     // Verify and decode token
-    const jwt = await import('jsonwebtoken');
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
     // Get user from database
