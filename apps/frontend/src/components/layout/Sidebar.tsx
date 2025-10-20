@@ -11,7 +11,12 @@ import {
   ChevronRight,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Brain,
+  MessageSquare,
+  Database,
+  TrendingUp,
+  Wrench
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
 
@@ -33,7 +38,19 @@ const navigationItems: NavItem[] = [
   { name: 'Invoices', path: '/invoices', icon: FileText },
   { name: 'Expenses', path: '/expenses', icon: Receipt },
   { name: 'Clients', path: '/clients', icon: Users },
-  { name: 'Reports', path: '/reports', icon: BarChart3 }
+  { name: 'Reports', path: '/reports', icon: BarChart3 },
+  {
+    name: 'AI Agents',
+    path: '/ai-agents',
+    icon: Brain,
+    children: [
+      { name: 'Dashboard', path: '/ai-agents', icon: LayoutDashboard },
+      { name: 'Chat', path: '/ai-agents/chat', icon: MessageSquare },
+      { name: 'Knowledge Base', path: '/ai-agents/knowledge', icon: Database },
+      { name: 'Analytics', path: '/ai-agents/analytics', icon: TrendingUp },
+      { name: 'Settings', path: '/ai-agents/settings', icon: Wrench }
+    ]
+  }
 ];
 
 const bottomNavigationItems: NavItem[] = [

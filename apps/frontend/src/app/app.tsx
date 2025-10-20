@@ -17,6 +17,11 @@ import { Expenses } from '../pages/Expenses';
 import { Clients } from '../pages/Clients';
 import { Reports } from '../pages/Reports';
 import { Settings } from '../pages/Settings';
+import { AIAgentDashboard } from '../pages/ai-agents/AIAgentDashboard';
+import { AgentChat } from '../pages/ai-agents/AgentChat';
+import { KnowledgeBase } from '../pages/ai-agents/KnowledgeBase';
+import { AgentAnalytics } from '../pages/ai-agents/AgentAnalytics';
+import { AgentSettings } from '../pages/ai-agents/AgentSettings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +92,11 @@ export function App() {
           <Route path="/clients" element={<Clients />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/ai-agents" element={<AIAgentDashboard />} />
+          <Route path="/ai-agents/chat/:agentId?" element={<AgentChat />} />
+          <Route path="/ai-agents/knowledge" element={<KnowledgeBase />} />
+          <Route path="/ai-agents/analytics" element={<AgentAnalytics />} />
+          <Route path="/ai-agents/settings" element={<AgentSettings />} />
         </Route>
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
