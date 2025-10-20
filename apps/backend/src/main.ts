@@ -25,8 +25,12 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes - OAuth2 only (removed password-based auth)
+// Routes
 app.route('/api/auth', oauthRoutes);
+
+// CRM Routes
+import crmRoutes from './routes/crm';
+app.route('/api/crm', crmRoutes);
 
 const port = process.env.PORT || 3001;
 
