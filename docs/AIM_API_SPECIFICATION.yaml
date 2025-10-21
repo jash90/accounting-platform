@@ -1,0 +1,1299 @@
+openapi: 3.0.3
+info:
+  title: Authentication & Identity Management (AIM) API
+  description: |
+    Production-grade authentication and authorization API for the Accounting Platform.
+
+    ## Features
+    - JWT-based authentication (RS256)
+    - Multi-factor authentication (TOTP, SMS, Email, WebAuthn)
+    - Role-based access control (RBAC)
+    - OAuth 2.0 / OIDC integration
+    - SAML 2.0 SSO
+    - Passwordless authentication
+    - Comprehensive audit logging
+    - Session management
+
+    ## Security
+    All endpoints (except public auth endpoints) require a valid JWT access token in the Authorization header:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@accountingplatform.com
+
+servers:
+  - url: https://api.accountingplatform.com/v1
+    description: Production server
+  - url: https://staging-api.accountingplatform.com/v1
+    description: Staging server
+  - url: http://localhost:3001/api
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: MFA
+    description: Multi-factor authentication management
+  - name: Sessions
+    description: Session management
+  - name: Users
+    description: User management
+  - name: Roles & Permissions
+    description: RBAC management
+  - name: OAuth
+    description: OAuth 2.0 / SSO integration
+  - name: Passwordless
+    description: Passwordless authentication
+  - name: Audit
+    description: Audit logging
+  - name: Security
+    description: Security features
+
+paths:
+  # ==========================================================================
+  # AUTHENTICATION
+  # ==========================================================================
+
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Create a new user account with email and password
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, lastName]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecureP@ssw0rd!
+                  description: Must be at least 8 characters with uppercase, lowercase, number, and special character
+                firstName:
+                  type: string
+                  example: John
+                lastName:
+                  type: string
+                  example: Doe
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User created successfully
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                deviceFingerprint:
+                  type: string
+                  description: Optional device fingerprint for tracking
+                rememberMe:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Login successful
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+                    description: JWT access token (expires in 15 minutes)
+                  refreshToken:
+                    type: string
+                    description: Refresh token (expires in 7 days)
+                  mfaRequired:
+                    type: boolean
+                    description: True if MFA challenge is required
+                  mfaToken:
+                    type: string
+                    description: Temporary token for MFA verification
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Get a new access token using a refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                    description: New refresh token (token rotation)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout current session
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout-all:
+    post:
+      tags: [Authentication]
+      summary: Logout all sessions
+      description: Revoke all refresh tokens and invalidate all sessions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All sessions logged out
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/password/reset:
+    post:
+      tags: [Authentication]
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent (or would be sent)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: If an account with that email exists, we sent a password reset link.
+
+  /auth/password/reset/confirm:
+    post:
+      tags: [Authentication]
+      summary: Confirm password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/password/change:
+    post:
+      tags: [Authentication]
+      summary: Change password
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================================================
+  # MULTI-FACTOR AUTHENTICATION
+  # ==========================================================================
+
+  /mfa/enroll/totp:
+    post:
+      tags: [MFA]
+      summary: Enroll in TOTP MFA
+      description: Generate a TOTP secret and QR code for enrollment
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: TOTP enrollment data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                    description: Base32-encoded TOTP secret
+                  qrCode:
+                    type: string
+                    description: Data URL for QR code image
+                  backupCodes:
+                    type: array
+                    items:
+                      type: string
+                    description: One-time backup codes
+
+  /mfa/verify/totp:
+    post:
+      tags: [MFA]
+      summary: Verify TOTP code
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: '123456'
+                mfaToken:
+                  type: string
+                  description: Required during login flow
+      responses:
+        '200':
+          description: Code verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verified:
+                    type: boolean
+                  accessToken:
+                    type: string
+                    description: Present if this is a login flow
+                  refreshToken:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mfa/enroll/sms:
+    post:
+      tags: [MFA]
+      summary: Enroll in SMS MFA
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber]
+              properties:
+                phoneNumber:
+                  type: string
+                  example: '+1234567890'
+      responses:
+        '200':
+          description: Verification code sent
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mfa/verify/sms:
+    post:
+      tags: [MFA]
+      summary: Verify SMS code
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+      responses:
+        '200':
+          description: Code verified successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mfa/settings:
+    get:
+      tags: [MFA]
+      summary: Get MFA settings
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: MFA settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  methods:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        method:
+                          type: string
+                          enum: [totp, sms, email, webauthn, backup_codes]
+                        isVerified:
+                          type: boolean
+                        isPrimary:
+                          type: boolean
+
+    put:
+      tags: [MFA]
+      summary: Update MFA settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                primaryMethod:
+                  type: string
+                  enum: [totp, sms, email, webauthn]
+      responses:
+        '200':
+          description: Settings updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mfa/backup-codes:
+    get:
+      tags: [MFA]
+      summary: Get backup codes
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Backup codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                        isUsed:
+                          type: boolean
+
+    post:
+      tags: [MFA]
+      summary: Regenerate backup codes
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: New backup codes generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codes:
+                    type: array
+                    items:
+                      type: string
+
+  # ==========================================================================
+  # SESSIONS
+  # ==========================================================================
+
+  /sessions:
+    get:
+      tags: [Sessions]
+      summary: Get active sessions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+  /sessions/{sessionId}:
+    delete:
+      tags: [Sessions]
+      summary: Revoke a session
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session revoked
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================================================
+  # USERS
+  # ==========================================================================
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Users]
+      summary: Update user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                timezone:
+                  type: string
+                locale:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    delete:
+      tags: [Users]
+      summary: Delete user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================================================
+  # ROLES & PERMISSIONS
+  # ==========================================================================
+
+  /roles:
+    get:
+      tags: [Roles & Permissions]
+      summary: List all roles
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Role'
+
+    post:
+      tags: [Roles & Permissions]
+      summary: Create a new role
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+
+  /roles/{roleId}:
+    get:
+      tags: [Roles & Permissions]
+      summary: Get role details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+
+  /permissions:
+    get:
+      tags: [Roles & Permissions]
+      summary: List all permissions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Permission'
+
+  /users/{userId}/roles:
+    get:
+      tags: [Roles & Permissions]
+      summary: Get user roles
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User roles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Role'
+
+    post:
+      tags: [Roles & Permissions]
+      summary: Assign role to user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleId]
+              properties:
+                roleId:
+                  type: string
+                  format: uuid
+                organizationId:
+                  type: string
+                  format: uuid
+                validUntil:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Role assigned
+
+  /users/{userId}/permissions:
+    get:
+      tags: [Roles & Permissions]
+      summary: Get user permissions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Permission'
+
+  # ==========================================================================
+  # OAUTH / SSO
+  # ==========================================================================
+
+  /oauth/{provider}:
+    get:
+      tags: [OAuth]
+      summary: Initiate OAuth login
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github, microsoft]
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+
+  /oauth/{provider}/callback:
+    get:
+      tags: [OAuth]
+      summary: OAuth callback
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with tokens
+
+  # ==========================================================================
+  # PASSWORDLESS
+  # ==========================================================================
+
+  /auth/passwordless/magic-link:
+    post:
+      tags: [Passwordless]
+      summary: Request magic link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Magic link sent
+
+  /auth/passwordless/verify:
+    post:
+      tags: [Passwordless]
+      summary: Verify magic link token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /auth/webauthn/register/begin:
+    post:
+      tags: [Passwordless]
+      summary: Begin WebAuthn registration
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Registration challenge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+                  options:
+                    type: object
+
+  /auth/webauthn/register/complete:
+    post:
+      tags: [Passwordless]
+      summary: Complete WebAuthn registration
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Registration complete
+
+  /auth/webauthn/login/begin:
+    post:
+      tags: [Passwordless]
+      summary: Begin WebAuthn authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Authentication challenge
+
+  /auth/webauthn/login/complete:
+    post:
+      tags: [Passwordless]
+      summary: Complete WebAuthn authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Authentication successful
+
+  # ==========================================================================
+  # AUDIT LOGS
+  # ==========================================================================
+
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: Get audit logs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: eventType
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+# ==========================================================================
+# COMPONENTS
+# ==========================================================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profilePicture:
+          type: string
+          format: uri
+        isEmailVerified:
+          type: boolean
+        mfaEnabled:
+          type: boolean
+        authProvider:
+          type: string
+          enum: [local, google, github, microsoft, saml]
+        roles:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        deviceName:
+          type: string
+        deviceType:
+          type: string
+        ipAddress:
+          type: string
+        city:
+          type: string
+        countryCode:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        isCurrent:
+          type: boolean
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        level:
+          type: integer
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+        createdAt:
+          type: string
+          format: date-time
+
+    Permission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        resource:
+          type: string
+        action:
+          type: string
+        description:
+          type: string
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        eventCategory:
+          type: string
+        eventSeverity:
+          type: string
+        resource:
+          type: string
+        action:
+          type: string
+        result:
+          type: string
+        ipAddress:
+          type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    TooManyRequests:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            rateLimitExceeded:
+              value:
+                error: Too many requests
+                message: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMIT_EXCEEDED

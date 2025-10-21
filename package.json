@@ -13,7 +13,8 @@
     "build:all": "nx run-many --target=build --projects=frontend,backend",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:migrate-verify": "./scripts/migrate-and-verify.sh"
   },
   "private": true,
   "devDependencies": {
@@ -33,6 +34,7 @@
     "@testing-library/react": "16.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.9",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
     "@vitejs/plugin-react": "^4.2.0",
@@ -74,12 +76,15 @@
     "express-session": "^1.18.2",
     "hono": "^4.9.9",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.546.0",
     "nodemailer": "^7.0.6",
+    "otplib": "^12.0.1",
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "postgres": "^3.4.7",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.29.0",

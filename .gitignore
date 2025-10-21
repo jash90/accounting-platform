@@ -10,3 +10,16 @@ node_modules
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 .env
+
+# Build outputs
+dist/
+
+# Logs
+logs/
+*.log
+tmp/
+
+# IDE
+.vscode/
+.cursor/
+.playwright-mcp/
