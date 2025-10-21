@@ -222,6 +222,87 @@ oauthRoutes.get('/me', async (c) => {
   }
 });
 
+// Manual Microsoft callback handler
+async function handleMicrosoftCallback(code: string) {
+  const tenantId = process.env.MICROSOFT_TENANT_ID || 'common';
+
+  const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      code,
+      client_id: process.env.MICROSOFT_CLIENT_ID || '',
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET || '',
+      redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/microsoft/callback`,
+      grant_type: 'authorization_code',
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error('Failed to exchange code for tokens');
+  }
+
+  const tokens = await tokenResponse.json();
+
+  // Fetch user profile
+  const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  });
+
+  if (!profileResponse.ok) {
+    throw new Error('Failed to fetch user profile');
+  }
+
+  const profile = await profileResponse.json();
+
+  const oauthProfile = {
+    id: profile.id,
+    email: profile.mail || profile.userPrincipalName,
+    firstName: profile.givenName || '',
+    lastName: profile.surname || '',
+    profilePicture: undefined, // Microsoft Graph doesn't return photo URL directly
+    provider: 'microsoft' as const,
+  };
+
+  return await oauthService.findOrCreateUser(oauthProfile, tokens.access_token, tokens.refresh_token);
+}
+
+// Microsoft OAuth routes
+oauthRoutes.get('/microsoft', (c) => {
+  const tenantId = process.env.MICROSOFT_TENANT_ID || 'common';
+  const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+    `client_id=${process.env.MICROSOFT_CLIENT_ID}` +
+    `&redirect_uri=${encodeURIComponent(process.env.BACKEND_URL || 'http://localhost:3001')}/api/auth/microsoft/callback` +
+    `&response_type=code` +
+    `&scope=${encodeURIComponent('openid profile email User.Read')}` +
+    `&response_mode=query`;
+
+  return c.redirect(authUrl);
+});
+
+oauthRoutes.get('/microsoft/callback', async (c) => {
+  try {
+    const code = c.req.query('code');
+
+    if (!code) {
+      throw new Error('No authorization code provided');
+    }
+
+    const user = await handleMicrosoftCallback(code);
+    const token = oauthService.generateJWT(user);
+
+    // Redirect to frontend with token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
+    return c.redirect(`${frontendUrl}/auth/callback?token=${token}&provider=microsoft`);
+  } catch (error) {
+    console.error('Microsoft OAuth error:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
+    return c.redirect(`${frontendUrl}/auth/error?provider=microsoft`);
+  }
+});
+
 // OAuth provider status
 oauthRoutes.get('/providers', (c) => {
   return c.json({
@@ -235,6 +316,11 @@ oauthRoutes.get('/providers', (c) => {
         enabled: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
         name: 'GitHub',
         icon: 'github',
+      },
+      microsoft: {
+        enabled: !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
+        name: 'Microsoft',
+        icon: 'microsoft',
       },
     },
   });

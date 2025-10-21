@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { oauthRoutes } from './routes/oauth';
+import { authRoutes } from './routes/auth.enhanced';
 import { db } from './db';
 import { passport } from './services/oauth.service';
 
@@ -12,7 +13,7 @@ app.use('*', logger());
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:4200', 'http://localhost:5173', 'http://localhost:3000'],
+    origin: (process.env.CORS_ORIGINS || 'http://localhost:4200,http://localhost:5173,http://localhost:3000').split(','),
     credentials: true,
   })
 );
@@ -25,8 +26,9 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes - OAuth2 only (removed password-based auth)
-app.route('/api/auth', oauthRoutes);
+// Authentication Routes
+app.route('/api/auth', oauthRoutes); // OAuth (Google, GitHub, Microsoft)
+app.route('/api/auth', authRoutes); // Email/Password authentication
 
 const port = process.env.PORT || 3001;
 

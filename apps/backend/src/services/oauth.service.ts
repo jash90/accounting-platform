@@ -15,7 +15,7 @@ export interface OAuthProfile {
   firstName: string;
   lastName: string;
   profilePicture?: string;
-  provider: 'google' | 'github';
+  provider: 'google' | 'github' | 'microsoft';
 }
 
 class OAuth2Service {
