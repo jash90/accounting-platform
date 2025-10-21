@@ -223,6 +223,164 @@ Accounting Platform Team
     });
   }
 
+  async sendInvitationEmail(
+    email: string,
+    companyName: string,
+    invitationUrl: string,
+    expiresInMinutes: number
+  ): Promise<boolean> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>You're Invited to Join ${companyName}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background-color: #f5f5f5;
+            }
+            .container {
+              background-color: white;
+              border-radius: 8px;
+              padding: 30px;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 24px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            h1 {
+              color: #1f2937;
+              font-size: 24px;
+              margin-bottom: 20px;
+            }
+            p {
+              color: #4b5563;
+              margin-bottom: 20px;
+            }
+            .button {
+              display: inline-block;
+              background-color: #10b981;
+              color: white;
+              padding: 12px 30px;
+              text-decoration: none;
+              border-radius: 6px;
+              font-weight: 500;
+              margin: 20px 0;
+            }
+            .button:hover {
+              background-color: #059669;
+            }
+            .link {
+              color: #2563eb;
+              word-break: break-all;
+              font-size: 14px;
+            }
+            .company-badge {
+              background-color: #f3f4f6;
+              border-left: 4px solid #2563eb;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .company-badge strong {
+              color: #1f2937;
+              font-size: 18px;
+            }
+            .footer {
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              text-align: center;
+              color: #6b7280;
+              font-size: 14px;
+            }
+            .warning {
+              background-color: #fef3c7;
+              border: 1px solid #f59e0b;
+              border-radius: 6px;
+              padding: 12px;
+              margin: 20px 0;
+              color: #92400e;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Accounting Platform</div>
+            </div>
+
+            <h1>You're Invited!</h1>
+
+            <p>Hello,</p>
+
+            <p>You've been invited to join:</p>
+
+            <div class="company-badge">
+              <strong>${companyName}</strong>
+            </div>
+
+            <p>Click the button below to accept the invitation and set up your account:</p>
+
+            <div style="text-align: center;">
+              <a href="${invitationUrl}" class="button">Accept Invitation</a>
+            </div>
+
+            <p>Or copy and paste this link into your browser:</p>
+            <p class="link">${invitationUrl}</p>
+
+            <div class="warning">
+              <strong>Important:</strong> This invitation link will expire in ${expiresInMinutes} minutes for security reasons. If you didn't expect this invitation, you can safely ignore this email.
+            </div>
+
+            <div class="footer">
+              <p>This invitation was sent via Accounting Platform</p>
+              <p>If you have any questions, please contact the company administrator.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const text = `
+You're Invited to Join ${companyName}!
+
+Hello,
+
+You've been invited to join ${companyName} on the Accounting Platform.
+
+Click the link below to accept the invitation and set up your account:
+${invitationUrl}
+
+This invitation link will expire in ${expiresInMinutes} minutes for security reasons.
+
+If you didn't expect this invitation, you can safely ignore this email.
+
+Best regards,
+Accounting Platform Team
+    `.trim();
+
+    return this.sendEmail({
+      to: email,
+      subject: `You're Invited to Join ${companyName} - Accounting Platform`,
+      html,
+      text,
+    });
+  }
+
   async sendWelcomeEmail(email: string, firstName: string): Promise<boolean> {
     const html = `
       <!DOCTYPE html>

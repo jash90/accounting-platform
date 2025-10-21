@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { oauthRoutes } from './routes/oauth';
+import { superAdminRoutes } from './routes/superadmin';
+import { companyOwnerRoutes } from './routes/company-owner';
+import { userRoutes } from './routes/user';
 import { db } from './db';
 import { passport } from './services/oauth.service';
 
@@ -25,8 +28,11 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes - OAuth2 only (removed password-based auth)
+// Routes
 app.route('/api/auth', oauthRoutes);
+app.route('/api/superadmin', superAdminRoutes);
+app.route('/api/companies', companyOwnerRoutes);
+app.route('/api/user', userRoutes);
 
 const port = process.env.PORT || 3001;
 

@@ -571,3 +571,245 @@ export const permissionsRelations = relations(permissions, ({ many }) => ({
   roles: many(rolePermissions),
   users: many(userPermissions),
 }));
+
+// ============================================================================
+// COMPANY MANAGEMENT & MODULE SYSTEM
+// ============================================================================
+
+export const companies = pgTable('companies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
+
+  // Company details
+  description: text('description'),
+  logo: text('logo'),
+  website: varchar('website', { length: 255 }),
+
+  // Contact information
+  email: varchar('email', { length: 255 }),
+  phone: varchar('phone', { length: 50 }),
+  address: text('address'),
+
+  // Status
+  isActive: boolean('is_active').notNull().default(true),
+
+  // Subscription/Plan (optional for future)
+  planType: varchar('plan_type', { length: 50 }).default('basic'), // basic, professional, enterprise
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index('idx_companies_slug').on(table.slug),
+  activeIdx: index('idx_companies_active').on(table.isActive),
+}));
+
+export type Company = typeof companies.$inferSelect;
+export type NewCompany = typeof companies.$inferInsert;
+
+// Company ownership and membership
+export const companyUsers = pgTable('company_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  // Role within company
+  role: varchar('role', { length: 50 }).notNull(), // owner, employee
+
+  // Status
+  isActive: boolean('is_active').notNull().default(true),
+
+  // Timestamps
+  joinedAt: timestamp('joined_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  companyUserIdx: uniqueIndex('unique_company_user').on(table.companyId, table.userId),
+  companyIdIdx: index('idx_company_users_company_id').on(table.companyId),
+  userIdIdx: index('idx_company_users_user_id').on(table.userId),
+  roleIdx: index('idx_company_users_role').on(table.role),
+}));
+
+export type CompanyUser = typeof companyUsers.$inferSelect;
+export type NewCompanyUser = typeof companyUsers.$inferInsert;
+
+// Available modules in the system
+export const modules = pgTable('modules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
+  displayName: varchar('display_name', { length: 100 }).notNull(),
+  description: text('description'),
+  icon: varchar('icon', { length: 50 }), // Icon identifier for frontend
+
+  // Module metadata
+  isCore: boolean('is_core').notNull().default(false), // Core modules always enabled
+  requiresPlan: varchar('requires_plan', { length: 50 }), // minimum plan required
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index('idx_modules_name').on(table.name),
+}));
+
+export type Module = typeof modules.$inferSelect;
+export type NewModule = typeof modules.$inferInsert;
+
+// Company-level module activation
+export const companyModules = pgTable('company_modules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => modules.id, { onDelete: 'cascade' }),
+
+  // Activation status
+  isEnabled: boolean('is_enabled').notNull().default(true),
+
+  // Who activated it
+  enabledBy: uuid('enabled_by').references(() => users.id, { onDelete: 'set null' }),
+  enabledAt: timestamp('enabled_at').notNull().defaultNow(),
+
+  // Configuration (module-specific settings)
+  configuration: jsonb('configuration').default({}),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  companyModuleIdx: uniqueIndex('unique_company_module').on(table.companyId, table.moduleId),
+  companyIdIdx: index('idx_company_modules_company_id').on(table.companyId),
+  moduleIdIdx: index('idx_company_modules_module_id').on(table.moduleId),
+  enabledIdx: index('idx_company_modules_enabled').on(table.isEnabled),
+}));
+
+export type CompanyModule = typeof companyModules.$inferSelect;
+export type NewCompanyModule = typeof companyModules.$inferInsert;
+
+// Employee-level module access (granted by company owner)
+export const employeeModuleAccess = pgTable('employee_module_access', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => modules.id, { onDelete: 'cascade' }),
+
+  // Access details
+  canRead: boolean('can_read').notNull().default(true),
+  canWrite: boolean('can_write').notNull().default(false),
+  canDelete: boolean('can_delete').notNull().default(false),
+
+  // Who granted access
+  grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+  grantedAt: timestamp('granted_at').notNull().defaultNow(),
+
+  // Expiration (optional)
+  expiresAt: timestamp('expires_at'),
+
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  employeeModuleIdx: uniqueIndex('unique_employee_module').on(table.companyId, table.userId, table.moduleId),
+  companyIdIdx: index('idx_employee_module_access_company_id').on(table.companyId),
+  userIdIdx: index('idx_employee_module_access_user_id').on(table.userId),
+  moduleIdIdx: index('idx_employee_module_access_module_id').on(table.moduleId),
+  expiresAtIdx: index('idx_employee_module_access_expires').on(table.expiresAt),
+}));
+
+export type EmployeeModuleAccess = typeof employeeModuleAccess.$inferSelect;
+export type NewEmployeeModuleAccess = typeof employeeModuleAccess.$inferInsert;
+
+// Invitation tokens for employee onboarding
+export const invitationTokens = pgTable('invitation_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Who is being invited
+  email: varchar('email', { length: 255 }).notNull(),
+
+  // To which company
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+
+  // Invitation role
+  role: varchar('role', { length: 50 }).notNull().default('employee'),
+
+  // Token details
+  token: varchar('token', { length: 512 }).notNull().unique(),
+  tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+
+  // Status
+  isUsed: boolean('is_used').notNull().default(false),
+  usedAt: timestamp('used_at'),
+  usedBy: uuid('used_by').references(() => users.id, { onDelete: 'set null' }),
+
+  // Who sent the invitation
+  invitedBy: uuid('invited_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  // Timestamps
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(), // 30 minutes from creation
+
+  // Context
+  ipAddress: inet('ip_address'),
+  userAgent: text('user_agent'),
+}, (table) => ({
+  emailIdx: index('idx_invitation_tokens_email').on(table.email),
+  companyIdIdx: index('idx_invitation_tokens_company_id').on(table.companyId),
+  tokenHashIdx: index('idx_invitation_tokens_token_hash').on(table.tokenHash),
+  expiresAtIdx: index('idx_invitation_tokens_expires_at').on(table.expiresAt),
+  isUsedIdx: index('idx_invitation_tokens_is_used').on(table.isUsed),
+}));
+
+export type InvitationToken = typeof invitationTokens.$inferSelect;
+export type NewInvitationToken = typeof invitationTokens.$inferInsert;
+
+// Relations for companies
+export const companiesRelations = relations(companies, ({ many }) => ({
+  users: many(companyUsers),
+  modules: many(companyModules),
+  invitations: many(invitationTokens),
+}));
+
+export const companyUsersRelations = relations(companyUsers, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyUsers.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [companyUsers.userId],
+    references: [users.id],
+  }),
+}));
+
+export const modulesRelations = relations(modules, ({ many }) => ({
+  companies: many(companyModules),
+  employeeAccess: many(employeeModuleAccess),
+}));
+
+export const companyModulesRelations = relations(companyModules, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyModules.companyId],
+    references: [companies.id],
+  }),
+  module: one(modules, {
+    fields: [companyModules.moduleId],
+    references: [modules.id],
+  }),
+}));
+
+export const employeeModuleAccessRelations = relations(employeeModuleAccess, ({ one }) => ({
+  company: one(companies, {
+    fields: [employeeModuleAccess.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [employeeModuleAccess.userId],
+    references: [users.id],
+  }),
+  module: one(modules, {
+    fields: [employeeModuleAccess.moduleId],
+    references: [modules.id],
+  }),
+}));
+
+export const invitationTokensRelations = relations(invitationTokens, ({ one }) => ({
+  company: one(companies, {
+    fields: [invitationTokens.companyId],
+    references: [companies.id],
+  }),
+  inviter: one(users, {
+    fields: [invitationTokens.invitedBy],
+    references: [users.id],
+  }),
+}));
