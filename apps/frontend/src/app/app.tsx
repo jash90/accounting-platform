@@ -17,6 +17,12 @@ import { Expenses } from '../pages/Expenses';
 import { Clients } from '../pages/Clients';
 import { Reports } from '../pages/Reports';
 import { Settings } from '../pages/Settings';
+import { SuperAdminGuard, CompanyOwnerGuard, CompanyMemberGuard } from '../components/guards/RoleGuards';
+import { AdminDashboard } from '../pages/admin/AdminDashboard';
+import { UserManagement } from '../pages/admin/UserManagement';
+import { CompanyManagement } from '../pages/admin/CompanyManagement';
+import { CompanyDashboard } from '../pages/company/CompanyDashboard';
+import { InvitationAccept } from '../pages/invitation/InvitationAccept';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +80,41 @@ export function App() {
           }
         />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/invitation/accept" element={<InvitationAccept />} />
+
+        {/* SuperAdmin Routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute>
+              <SuperAdminGuard>
+                <AppLayout />
+              </SuperAdminGuard>
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="companies" element={<CompanyManagement />} />
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        </Route>
+
+        {/* Company Routes */}
+        <Route
+          path="/company/:companyId/*"
+          element={
+            <ProtectedRoute>
+              <CompanyMemberGuard>
+                <AppLayout />
+              </CompanyMemberGuard>
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<CompanyDashboard />} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+        </Route>
+
+        {/* General Protected Routes */}
         <Route
           element={
             <ProtectedRoute>

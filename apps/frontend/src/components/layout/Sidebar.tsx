@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
@@ -11,9 +11,16 @@ import {
   ChevronRight,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Shield,
+  Building2,
+  Package
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
+import { useIsSuperAdmin } from '../../hooks/useRBAC';
+import { IfSuperAdmin } from '../rbac/PermissionComponents';
+import { CompanySelector } from '../company/CompanySelector';
+import { RoleBadge } from '../rbac/PermissionComponents';
 
 interface NavItem {
   name: string;
@@ -28,6 +35,14 @@ interface SidebarProps {
   isMobile?: boolean;
 }
 
+// SuperAdmin navigation items
+const adminNavigationItems: NavItem[] = [
+  { name: 'Admin Dashboard', path: '/admin/dashboard', icon: Shield },
+  { name: 'User Management', path: '/admin/users', icon: Users },
+  { name: 'Company Management', path: '/admin/companies', icon: Building2 }
+];
+
+// General navigation items
 const navigationItems: NavItem[] = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'Invoices', path: '/invoices', icon: FileText },
@@ -42,7 +57,9 @@ const bottomNavigationItems: NavItem[] = [
 
 export function Sidebar({ isOpen, onToggle, isMobile = false }: SidebarProps) {
   const location = useLocation();
+  const { companyId } = useParams<{ companyId: string }>();
   const { user, logout } = useAuthStore();
+  const isSuperAdmin = useIsSuperAdmin();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   // Auto-expand parent items if child is active
@@ -174,12 +191,45 @@ export function Sidebar({ isOpen, onToggle, isMobile = false }: SidebarProps) {
               {user?.firstName} {user?.lastName}
             </p>
             <p className="text-xs text-gray-500">{user?.email}</p>
+            {user && (
+              <div className="mt-1">
+                <RoleBadge isSuperAdmin={user.isSuperAdmin} />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Company Selector (show when on company route) */}
+      {companyId && (
+        <div className="px-4 py-3 border-b border-gray-200">
+          <CompanySelector />
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+        {/* SuperAdmin Section */}
+        <IfSuperAdmin>
+          <div className="mb-4">
+            <div className="px-3 mb-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                SuperAdmin
+              </h3>
+            </div>
+            {adminNavigationItems.map((item) => (
+              <NavItem key={item.path} item={item} />
+            ))}
+          </div>
+          <div className="border-t border-gray-200 my-3"></div>
+        </IfSuperAdmin>
+
+        {/* Regular Navigation */}
+        <div className="px-3 mb-2">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            General
+          </h3>
+        </div>
         {navigationItems.map((item) => (
           <NavItem key={item.path} item={item} />
         ))}
