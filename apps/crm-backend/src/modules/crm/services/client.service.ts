@@ -5,8 +5,8 @@
  */
 
 import { eq, and, or, sql, desc, asc, isNull, ilike, inArray } from 'drizzle-orm';
-import { db } from '../../../db';
 import {
+  db,
   clients,
   clientContacts,
   clientTimelineEvents,
@@ -16,7 +16,7 @@ import {
   type ClientContact,
   type NewClientContact,
   type ClientTimelineEvent,
-} from '../../../db/schema';
+} from '../../../../../backend/src/db';
 import type {
   CreateClientInput,
   UpdateClientInput,
@@ -314,7 +314,7 @@ export class ClientService {
     const offset = (page - 1) * limit;
 
     // Fetch data
-    const orderColumn = clients[sortBy as keyof typeof clients] || clients.createdAt;
+    const orderColumn: any = clients[sortBy as keyof typeof clients] || clients.createdAt;
     const orderFn = sortOrder === 'asc' ? asc : desc;
 
     const results = await db
@@ -550,8 +550,8 @@ export class ClientService {
       factors.push('Duże przedsiębiorstwo');
     }
 
-    // Annual revenue
-    if (data.annualRevenue && data.annualRevenue < 100000) {
+    // Annual revenue (convert decimal string to number)
+    if (data.annualRevenue && parseFloat(data.annualRevenue) < 100000) {
       score += 10;
       factors.push('Niski roczny obrót');
     }

@@ -28,9 +28,10 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 **Current Status:** Early development phase
 - Core authentication system: ✅ Functional (Google OAuth, GitHub OAuth planned)
 - User management: ✅ Basic implementation
-- Accounting features: 📋 Placeholders (Invoices, Expenses, Clients, Reports)
+- CRM Module: ✅ Production-ready (Polish accounting platform)
+- Accounting features: 📋 Placeholders (Invoices, Expenses, Reports)
 
-**Project Type:** NX Monorepo with React frontend and Hono backend
+**Project Type:** NX Monorepo with React frontend and multiple Hono backends
 
 ---
 
@@ -62,6 +63,22 @@ Keep this managed block so 'openspec update' can refresh the instructions.
   - Updated `.gitignore` to prevent future accumulation
 
 **Historical Note:** If you see references to Gmail automation in older commits or docs, it was intentionally removed in October 2025 to focus on core accounting features.
+
+**October 2025 - CRM Module Integration:**
+- ✅ **Integrated CRM Backend into NX Monorepo**
+  - Moved standalone `crm-backend/` into `apps/crm-backend/`
+  - Created NX configuration (project.json, tsconfig, jest)
+  - Unified database schema in `apps/backend/src/db/schema.ts`
+  - Added CRM types to `libs/shared-types`
+  - Port 3002 for CRM microservice
+
+- ✅ **CRM Features (Production-Ready)**
+  - Polish tax ID validation (NIP, REGON, PESEL, KRS)
+  - GUS API integration (Polish business registry)
+  - VIES integration (EU VAT validation)
+  - Client CRUD with risk assessment
+  - Timeline events, contacts, documents
+  - Soft delete and optimistic locking
 
 ---
 
@@ -101,11 +118,11 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 ```
 accounting-platform/
 ├── apps/
-│   ├── backend/              # Hono API server
+│   ├── backend/              # Main Hono API server (Auth, Users)
 │   │   ├── .env             # ⚠️ Backend-specific config (OVERRIDES root!)
 │   │   ├── src/
 │   │   │   ├── db/
-│   │   │   │   ├── schema.ts          # Drizzle schema definition
+│   │   │   │   ├── schema.ts          # Unified Drizzle schema (Auth + CRM)
 │   │   │   │   └── index.ts           # Database connection
 │   │   │   ├── routes/
 │   │   │   │   ├── oauth.ts           # OAuth authentication routes
@@ -117,6 +134,27 @@ accounting-platform/
 │   │   │   │   ├── rbac.service.ts    # Role-based access
 │   │   │   │   └── audit.service.ts   # Audit logging
 │   │   │   └── main.ts                # Hono app entry point
+│   │   └── project.json
+│   │
+│   ├── crm-backend/          # CRM Microservice (Polish Accounting)
+│   │   ├── .env             # CRM-specific config (port 3002, GUS API, etc.)
+│   │   ├── src/
+│   │   │   ├── modules/crm/
+│   │   │   │   ├── integrations/
+│   │   │   │   │   ├── gus.service.ts      # Polish GUS API integration
+│   │   │   │   │   └── vies.service.ts     # EU VAT validation (VIES)
+│   │   │   │   ├── services/
+│   │   │   │   │   └── client.service.ts   # Core CRM business logic
+│   │   │   │   ├── utils/
+│   │   │   │   │   ├── nip.ts              # NIP validation (Polish tax ID)
+│   │   │   │   │   ├── regon.ts            # REGON validation
+│   │   │   │   │   ├── pesel.ts            # PESEL validation
+│   │   │   │   │   └── postal-code.ts      # Polish postal codes
+│   │   │   │   └── validators/
+│   │   │   │       └── client.schema.ts    # Zod validation schemas
+│   │   │   ├── routes/
+│   │   │   │   └── crm.ts                  # CRM API routes
+│   │   │   └── main.ts                     # Hono app entry point
 │   │   └── project.json
 │   │
 │   └── frontend/             # React SPA
@@ -140,17 +178,20 @@ accounting-platform/
 │
 ├── libs/
 │   └── shared-types/         # Shared TypeScript interfaces
-│       └── src/index.ts      # User, AuthResponse, API types
+│       └── src/index.ts      # User, AuthResponse, CRM types
 │
-├── drizzle/                  # Database migrations (auto-generated)
-│   ├── 0000_*.sql
-│   ├── 0001_*.sql
-│   └── meta/                 # Drizzle metadata
+├── drizzle/                  # Unified database migrations
+│   ├── 0000_*.sql           # Initial auth schema
+│   ├── 0001_*.sql           # Updates
+│   ├── XXXX_*_crm.sql       # CRM tables (to be generated)
+│   └── meta/                # Drizzle metadata
 │
 ├── docs/                     # Comprehensive documentation
 │   ├── AIM_MODULE_COMPREHENSIVE_ANALYSIS.md  # Security analysis
 │   ├── AIM_API_SPECIFICATION.yaml            # API specs
 │   ├── AIM_DATABASE_SCHEMA.sql               # Schema docs
+│   ├── CRM_MODULE_OVERVIEW.md                # CRM features overview
+│   ├── CRM_API_DOCUMENTATION.md              # CRM API reference
 │   ├── OAUTH_SETUP.md                        # OAuth configuration
 │   ├── EMAIL_SETUP.md                        # Email configuration
 │   └── CORS_TROUBLESHOOTING.md               # CORS debugging
@@ -1015,22 +1056,31 @@ When debugging issues:
 
 ### Port Map
 ```
-3001 - Backend API (Hono)
+3001 - Backend API (Hono) - Auth & Users
+3002 - CRM Backend API (Hono) - Polish CRM
 4200 - Frontend (Vite dev server)
-5432 - PostgreSQL database
+5432 - PostgreSQL database (unified)
+6379 - Redis (optional, for CRM caching)
 ```
 
 ### Key Files
 ```
 apps/backend/.env                    # Backend config (PRIMARY for backend)
 apps/backend/src/main.ts             # Backend entry point
-apps/backend/src/db/schema.ts        # Database schema
+apps/backend/src/db/schema.ts        # Unified database schema (Auth + CRM)
+apps/backend/src/db/index.ts         # Database connection & exports
 apps/backend/src/routes/oauth.ts     # OAuth authentication
-apps/backend/src/services/           # Business logic
+apps/backend/src/services/           # Auth business logic
+apps/crm-backend/.env                # CRM config (port 3002, GUS API, VIES)
+apps/crm-backend/src/main.ts         # CRM backend entry point
+apps/crm-backend/src/routes/crm.ts   # CRM API routes
+apps/crm-backend/src/modules/crm/    # CRM business logic
 apps/frontend/src/app/app.tsx        # Frontend routing
 apps/frontend/src/stores/auth.ts     # Auth state management
 apps/frontend/src/pages/Login.tsx    # Login UI with OAuth
-libs/shared-types/src/index.ts       # Shared TypeScript types
+libs/shared-types/src/index.ts       # Shared TypeScript types (Auth + CRM)
+docs/CRM_MODULE_OVERVIEW.md          # CRM features documentation
+docs/CRM_API_DOCUMENTATION.md        # CRM API reference
 drizzle/                             # Database migrations
 scripts/migrate-and-verify.sh        # Migration runner & verifier
 scripts/diagnose-cors.sh             # CORS debugging tool

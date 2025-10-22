@@ -186,7 +186,7 @@ export const createClientSchema = z
     annualRevenue: z.number().min(0).optional(),
 
     // Custom Fields
-    customFields: z.record(z.any()).default({}),
+    customFields: z.record(z.string(), z.any()).default({}),
     tags: z.array(z.string().trim()).default([]),
 
     // Notes

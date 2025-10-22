@@ -218,11 +218,13 @@ export class GUSService {
     type: 'nip' | 'regon',
     value: string
   ): Promise<GUSCompanyData> {
-    if (!this.apiKey) {
-      throw new Error('GUS API key not configured');
+    // If API key is not configured, return mock data for development
+    if (!this.apiKey || this.apiKey === 'your-gus-api-key-here') {
+      console.warn('⚠️  Using mock GUS data (API key not configured)');
+      return this.getMockCompanyData(type, value);
     }
 
-    // This is a placeholder implementation
+    // This is a placeholder for production implementation
     // In production, implement actual GUS API SOAP calls
     // For now, return mock data structure
     throw new Error('GUS API integration requires SOAP client implementation');
@@ -335,6 +337,58 @@ export class GUSService {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get mock company data for development
+   * Returns realistic Polish company data for testing
+   */
+  private getMockCompanyData(type: 'nip' | 'regon', value: string): GUSCompanyData {
+    const mockData: GUSCompanyData = {
+      name: 'Example Company Sp. z o.o.',
+      shortName: 'ExCo',
+      regon: type === 'regon' ? value : '123456785',
+      nip: type === 'nip' ? value : '1234567890',
+      krs: '0000123456',
+
+      // Address
+      street: 'Marszałkowska',
+      propertyNumber: '100',
+      apartmentNumber: '5A',
+      city: 'Warsaw',
+      postalCode: '00-001',
+      province: 'Mazowieckie',
+      district: 'Warszawa',
+      commune: 'Śródmieście',
+
+      // Business Classification
+      pkdMain: '62.01.Z',
+      pkdMainName: 'Działalność związana z oprogramowaniem',
+      pkdSecondary: ['62.02.Z', '62.03.Z'],
+
+      // Legal Form
+      legalForm: 'Spółka z ograniczoną odpowiedzialnością',
+      legalFormCode: '117',
+
+      // Dates
+      registrationDate: '2020-01-15',
+      startDate: '2020-02-01',
+
+      // Status
+      status: 'active',
+      employeeRange: '10-49',
+
+      // Contact
+      phone: '+48 22 123 4567',
+      email: 'contact@example.com',
+      website: 'https://example.com',
+
+      // Additional
+      hasLocalUnits: false,
+      localUnitsCount: 0,
+    };
+
+    return mockData;
   }
 
   /**

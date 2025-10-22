@@ -29,15 +29,11 @@ import { validateEUVAT } from '../modules/crm/integrations/vies.service';
 
 const crm = new Hono();
 
-// Middleware to extract user from JWT (placeholder - implement actual auth)
-const requireAuth = async (c: any, next: any) => {
+// Helper to get user ID (placeholder - implement actual JWT authentication)
+const getUserId = (c: any): string => {
   // TODO: Implement actual JWT authentication
-  const userId = c.req.header('x-user-id') || 'system';
-  c.set('userId', userId);
-  await next();
+  return c.req.header('x-user-id') || 'system';
 };
-
-crm.use('*', requireAuth);
 
 // ============================================================================
 // Client CRUD Operations
@@ -53,7 +49,7 @@ crm.get(
   async (c) => {
     try {
       const query = c.req.valid('query');
-      const userId = c.get('userId');
+      const userId = getUserId(c);
 
       const service = getClientService();
       const result = await service.listClients(query, userId);
@@ -113,7 +109,7 @@ crm.post(
   async (c) => {
     try {
       const data = c.req.valid('json');
-      const userId = c.get('userId');
+      const userId = getUserId(c);
 
       const service = getClientService();
       const client = await service.createClient(data, userId);
@@ -150,7 +146,7 @@ crm.put(
     try {
       const id = c.req.param('id');
       const data = c.req.valid('json');
-      const userId = c.get('userId');
+      const userId = getUserId(c);
 
       const service = getClientService();
       const client = await service.updateClient(id, data, userId);
@@ -180,7 +176,7 @@ crm.put(
 crm.delete('/clients/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const userId = c.get('userId');
+    const userId = getUserId(c);
 
     const service = getClientService();
     await service.deleteClient(id, userId);
@@ -208,7 +204,7 @@ crm.delete('/clients/:id', async (c) => {
 crm.post('/clients/:id/restore', async (c) => {
   try {
     const id = c.req.param('id');
-    const userId = c.get('userId');
+    const userId = getUserId(c);
 
     const service = getClientService();
     const client = await service.restoreClient(id, userId);
@@ -243,13 +239,17 @@ crm.get(
   zValidator('query', searchClientsQuerySchema),
   async (c) => {
     try {
-      const { query, limit } = c.req.valid('query');
+      const queryParams = c.req.valid('query');
 
       const service = getClientService();
       const results = await service.listClients({
-        search: query,
-        limit: limit || 10,
+        ...queryParams,
+        search: queryParams.query,
+        limit: queryParams.limit || 10,
         page: 1,
+        sortBy: 'createdAt' as const,
+        sortOrder: 'desc' as const,
+        includeDeleted: false,
       });
 
       return c.json({
@@ -280,7 +280,7 @@ crm.get(
 crm.post('/clients/:id/enrich-gus', async (c) => {
   try {
     const id = c.req.param('id');
-    const userId = c.get('userId');
+    const userId = getUserId(c);
 
     const service = getClientService();
     const client = await service.enrichFromGUS(id, userId);
@@ -309,7 +309,7 @@ crm.post('/clients/:id/enrich-gus', async (c) => {
 crm.post('/clients/:id/validate-vat', async (c) => {
   try {
     const id = c.req.param('id');
-    const userId = c.get('userId');
+    const userId = getUserId(c);
 
     const service = getClientService();
     const result = await service.validateVATEU(id, userId);

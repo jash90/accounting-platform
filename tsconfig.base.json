@@ -15,7 +15,8 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@accounting-platform/shared-types": ["libs/shared-types/src"]
+      "@accounting-platform/shared-types": ["libs/shared-types/src"],
+      "@accounting-platform/backend-db": ["apps/backend/src/db"]
     }
   },
   "exclude": ["node_modules", "tmp"]
