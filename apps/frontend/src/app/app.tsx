@@ -15,6 +15,8 @@ import { AuthCallback } from '../pages/AuthCallback';
 import { Invoices } from '../pages/Invoices';
 import { Expenses } from '../pages/Expenses';
 import { Clients } from '../pages/Clients';
+import { ClientDetail } from '../pages/ClientDetail';
+import { ClientCreate } from '../pages/ClientCreate';
 import { Reports } from '../pages/Reports';
 import { Settings } from '../pages/Settings';
 
@@ -85,6 +87,9 @@ export function App() {
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/clients" element={<Clients />} />
+          <Route path="/clients/new" element={<ClientCreate />} />
+          <Route path="/clients/:id" element={<ClientDetail />} />
+          <Route path="/clients/:id/edit" element={<ClientDetail />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
